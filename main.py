@@ -44,7 +44,7 @@ def main():
         print("Access token obtained.")
 
     # Add each exercise to Everfit
-    for exercise_info in exercises_list[:3]:
+    for exercise_info in exercises_list[:]:
         payload = get_payload(session, access_token, exercise_info, exercise_df)
         add_exercise_response = add_exercise(session, payload, access_token)
         if not add_exercise_response:
