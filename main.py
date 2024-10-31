@@ -22,7 +22,7 @@ def main():
 
     # Load excel data in
     file_path = 'ExerciseData.xlsx'
-    exercise_df = pd.read_excel(file_path, sheet_name='DATA Exercises')
+    exercise_df = pd.read_excel(file_path)
 
     # Define start index (first cell under 'EXERCISE NAME' in first column) and get exercise list
     start_index = exercise_df[exercise_df.iloc[:, 0] == 'EXERCISE NAME'].index[0] + 1

@@ -28,9 +28,13 @@ def add_exercises_to_excel(exercise_df, exercise_info_list, start_row_index):
                     break   
         # Add tags
         video_link_index = col_names.index("Video link") 
+        skill_names_or_equipment = ["SKILL NAME 1", "SKILL NAME 2", "SKILL NAME 3", "EQUIPMENT 1", "EQUIPMENT 2", "EQUIPMENT 3", "EQUIPMENT 4"]
         # go through each column, if there is a tag == column, put 1 else 0
         for col_name in col_names[video_link_index+1:]:
-            if any(tag.lower() == col_name.lower() for tag in tags):
+            # leave blank if a skill name or equipment
+            if col_name in skill_names_or_equipment:
+                exercise_df.loc[cur_row_index, col_name] = ""
+            elif any(tag.lower() == col_name.lower() for tag in tags):
                 exercise_df.loc[cur_row_index, col_name] = 1
             else:
                 exercise_df.loc[cur_row_index, col_name] = 0   
@@ -47,7 +51,7 @@ def fetch_individual_exercise_details(response, session, headers):
     total_exercises = len(response['data'])
     i = 1
 
-    for exercise in reversed(response['data'][:5]):
+    for exercise in reversed(response['data'][:]):
         # get id and request details
         detail_url = base_url + exercise['_id']
         detail_response = session.get(detail_url, headers=headers)
@@ -70,7 +74,7 @@ def fetch_individual_exercise_details(response, session, headers):
                 "Movement pattern 3": exercise_data['movement_patterns'][2]['movement_pattern']['title'] if len(exercise_data['movement_patterns']) > 2 else "",
                 "Category": exercise_data.get('category_type_name', ""),
                 "Tracking fields": ', '.join([REVERSE_TRACKING_FIELDS_MAP.get(field_id, 'Unknown').capitalize() for field_id in exercise_data['fields'][:-1]]),
-                "Instructions": ' '.join(exercise_data.get('instructions', [])),
+                "Instructions": '\n'.join(exercise_data.get('instructions', [])),
                 "Video link": exercise_data.get('videoLink', ""),
                 "Tags": get_tags_from_exercise_data(exercise_data.get('tags', []))
             }
