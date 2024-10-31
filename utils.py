@@ -15,13 +15,13 @@ def get_payload(session, access_token, exercise_info, exercise_df):
     Returns:
         dict: A dictionary representing the payload with exercise details, ready to be sent to the API.
     """
-
+   
     # Default payload
     payload = {
         "author": "666c67f6c98eb80026f047c9",
         "author_name": "Ruben Lopez Martinez", 
         "title": exercise_info["exercise_name"],
-        "instructions": exercise_info["instructions"].split('\n') if exercise_info["instructions"] else [],
+        "instructions": [] if pd.isna(exercise_info.get("instructions", [])) else exercise_info.get("instructions", []),
         "fields": [],
         "link": "",
         "modality": "66013e83b117d35345209b07",
@@ -34,9 +34,9 @@ def get_payload(session, access_token, exercise_info, exercise_df):
     }
     
     # Category Type (required)
-    category = exercise_info["category"]
-    payload["category_type"] = CATEGORY_TYPE_MAP.get(str(category).lower().replace(" ", ""), "")
-    payload["category_type_name"] = category
+    category = exercise_info.get("category", "strength")
+    payload["category_type"] = CATEGORY_TYPE_MAP.get(str(category).lower().replace(" ", ""), "5cd912c319ae01d22ea76012") # else its the strength category id
+    payload["category_type_name"] = "strength" if pd.isna(category) else category
 
     # Modality (optional, but has default)
     modality = exercise_info["modality"]
@@ -88,7 +88,8 @@ def get_payload(session, access_token, exercise_info, exercise_df):
     payload["tags"] = tags
 
     # Video link
-    payload["videoLink"] = ""
+    video_link = exercise_info.get("video_link", "")
+    payload["videoLink"] = video_link
 
     return payload
 
@@ -113,8 +114,8 @@ def get_exercises_list(start_index, exercise_df):
         if pd.isna(exercise_df.iloc[i, 0]):
             break
         
-        # Moves to next if video status is a 2 (already uploaded into Everfit)
-        if exercise_df.iloc[i, 1] == 2:
+        # Moves to next if video status is a 2 (already uploaded into Everfit) or 0 (not ready)
+        if exercise_df.iloc[i, 1] != 1:
             continue
         
         # Creates a dictionary of exercise info
@@ -214,8 +215,9 @@ def get_exercises_list(start_index, exercise_df):
                 "postS_legs": exercise_df.iloc[i, 87],
                 "postS_rings": exercise_df.iloc[i, 88],
                 "postS_altern_rings": exercise_df.iloc[i, 89],
-                "postS_weights": exercise_df.iloc[i, 90]
-            }
+                "postS_weights": exercise_df.iloc[i, 90],
+            },
+            "video_link": exercise_df.iloc[i, 91] if not pd.isna(exercise_df.iloc[i, 91]) else ""
         }
 
         # Adds to list of exercises

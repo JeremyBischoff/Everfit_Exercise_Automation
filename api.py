@@ -57,8 +57,8 @@ def add_exercise(session, payload, access_token):
     # Define headers
     headers = {
         "Content-Type": "application/json;charset=UTF-8",
-        "x-access-token": access_token,
-        "x-app-type": "web-coach",
+        "X-Access-Token": access_token,
+        "X-App-Type": "web-coach",
     }
 
     # Send the POST request to add the exercise
@@ -78,7 +78,9 @@ def get_exercises(session, access_token):
         dict: The JSON response containing the exercises if successful, or None if the request fails.
     """
 
-    # Define url
+    total_exercises = 50
+
+    # Define urls
     url = "https://api-prod3.everfit.io/api/exercise/search_filter_library"
 
     # Define payload
@@ -91,7 +93,7 @@ def get_exercises(session, access_token):
         "movement_patterns": [],
         "muscle_groups": [],
         "page": 1,
-        "per_page": 50,
+        "per_page": total_exercises,
         "q": "",
         "sort": -1,
         "sorter": "last_interacted",
@@ -107,12 +109,16 @@ def get_exercises(session, access_token):
     }
 
     # Send a POST request to the url    
-    response = session.post(url, json=payload, headers=headers)
-    if response.ok:
+    initial_response = session.post(url, json=payload, headers=headers)
+    if initial_response.ok:
         print("Exercises retrieved successfully.")
+        total_exercises = initial_response.json()['total']
+        print("Total number of exercises:", total_exercises)
+        payload["per_page"] = total_exercises
+        response = session.post(url, json=payload, headers=headers)
         return response.json()
     else:
-        print("Failed to retrieve exercises:", response.status_code, response.text)
+        print("Failed to retrieve exercises:", initial_response.status_code, initial_response.text)
         return None
 
 def get_tag_list(session, access_token):
@@ -141,12 +147,10 @@ def get_tag_list(session, access_token):
     # Send a POST request to the url to get total number of tags
     response = session.get(url.format(per_page=default_per_page), headers=headers)
     if response.ok:
-        print("First 20 tags retrieved successfully.")
         total_tags = response.json()['data']['total']  
         # Send another POST request to the url to get the tags
         tag_list_response = session.get(url.format(per_page=total_tags), headers=headers)
         if tag_list_response.ok:
-            print("Full list of tags retrieved successfully.")
             tag_list = tag_list_response.json()['data']['data']
             return tag_list
         else:
@@ -188,7 +192,6 @@ def create_new_tag_id(session, access_token, tag):
     # Send a POST request to the url to make a new tag
     response = session.post(url, json=payload, headers=headers)
     if response.ok:
-        print("New tag made successfully.")
         data = response.json()['data']
         return data["_id"]
     else:

@@ -44,16 +44,18 @@ def main():
         print("Access token obtained.")
 
     # Add each exercise to Everfit
-    for exercise_info in exercises_list[-3:]:
+    for exercise_info in exercises_list[:3]:
         payload = get_payload(session, access_token, exercise_info, exercise_df)
         add_exercise_response = add_exercise(session, payload, access_token)
         if not add_exercise_response:
             print(f"Failed to add exercise {exercise_info['exercise_name']}")
             print(add_exercise_response.json())
+            print(add_exercise_response.status_code)
+            print(f"Payload: {payload}")
         else:
             print(f"Exercise {exercise_info['exercise_name']} added successfully.")
         # Sleep to not overload server
-        time.sleep(1)
+        #time.sleep(1)
 
     # Close session
     session.close()

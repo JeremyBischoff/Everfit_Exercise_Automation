@@ -23,7 +23,7 @@ MODALITY_MAP = {
 MOVEMENT_PATTERN_MAP = {
     "carry/gait": "66013f2fb117d35345209b0f",
     "corebracing": "66013f2fb117d35345209b09",
-    "coreflexion / Extension": "66013f2fb117d35345209b08",
+    "coreflexion/extension": "66013f2fb117d35345209b08",
     "corerotation": "66013f2fb117d35345209b0d",
     "locomotion": "66013f2fb117d35345209b0a",
     "lowerbodyhinge": "66013f2fb117d35345209b11",
@@ -74,6 +74,8 @@ TRACKING_FIELDS_MAP = {
     "rpm": "60a3a9115055501fba76a7ae",
     "round": "60decc9a46b851e3698d840f"
 }
+
+REVERSE_TRACKING_FIELDS_MAP = {v: k for k, v in TRACKING_FIELDS_MAP.items()}
 
 
 
