@@ -5,6 +5,7 @@ import pandas as pd
 
 def get_payload(session, access_token, exercise_info, exercise_df):
     """
+
     Constructs the payload for uploading an exercise to the Everfit API.
 
     Args:
@@ -15,13 +16,13 @@ def get_payload(session, access_token, exercise_info, exercise_df):
     Returns:
         dict: A dictionary representing the payload with exercise details, ready to be sent to the API.
     """
-   
+    
     # Default payload
     payload = {
         "author": "666c67f6c98eb80026f047c9",
         "author_name": "Ruben Lopez Martinez", 
         "title": exercise_info["exercise_name"],
-        "instructions": str(exercise_info["instructions"]).split('\n') if exercise_info["instructions"] else [],
+        "instructions": [] if pd.isna(exercise_info["instructions"]) else str(exercise_info["instructions"]).split('\n'),
         "fields": [],
         "link": "",
         "modality": "66013e83b117d35345209b07",
@@ -30,7 +31,7 @@ def get_payload(session, access_token, exercise_info, exercise_df):
         "picture": [],
         "thumbnail_url": "",
         "video": "",
-        "videoLink": "",
+        "videoLink": "" if pd.isna(exercise_info.get("video_link", "")) else exercise_info.get("video_link", ""),
     }
     
     # Category Type (required)
@@ -87,10 +88,6 @@ def get_payload(session, access_token, exercise_info, exercise_df):
             tags.append(tag_id)
     payload["tags"] = tags
 
-    # Video link
-    video_link = exercise_info.get("video_link", "")
-    payload["videoLink"] = video_link
-
     return payload
 
 def get_exercises_list(start_index, exercise_df):
@@ -137,7 +134,7 @@ def get_exercises_list(start_index, exercise_df):
             "category":  exercise_df.at[i, "Category"],
             "tracking_fields":  exercise_df.at[i, "Tracking fields"],
             "instructions": exercise_df.at[i, "Instructions"],
-            "video_link": exercise_df.at[i, "Video link"] if not pd.isna(exercise_df.iloc[i, 91]) else "",
+            "video_link": exercise_df.at[i, "Video link"],
             "tags": {
                 "exercise_level_1": exercise_df.at[i, "Basic"],
                 "exercise_level_2": exercise_df.at[i, "Intermediate"],

@@ -74,7 +74,7 @@ def fetch_individual_exercise_details(response, session, headers):
                 "Movement pattern 3": exercise_data['movement_patterns'][2]['movement_pattern']['title'] if len(exercise_data['movement_patterns']) > 2 else "",
                 "Category": exercise_data.get('category_type_name', ""),
                 "Tracking fields": ', '.join([REVERSE_TRACKING_FIELDS_MAP.get(field_id, 'Unknown').capitalize() for field_id in exercise_data['fields'][:-1]]),
-                "Instructions": '\n'.join(exercise_data.get('instructions', [])),
+                "Instructions": '\r\n'.join(exercise_data.get('instructions', [])),
                 "Video link": exercise_data.get('videoLink', ""),
                 "Tags": get_tags_from_exercise_data(exercise_data.get('tags', []))
             }

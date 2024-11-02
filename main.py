@@ -34,7 +34,7 @@ def main():
     # Define email and password
     email = input("Enter your email: ")
     password = getpass.getpass("Enter your password: ")
-
+    
     # Log in and get access token
     access_token = login(session, email, password)
     if not access_token:

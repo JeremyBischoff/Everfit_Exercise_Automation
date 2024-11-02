@@ -88,7 +88,7 @@ def get_exercises(session, access_token):
         "body_part": [],
         "category_type": [],
         "equipments": [],
-        "from": [False, False],
+        "from": [False, True], # [False, True] makes it only the Custom Exercises
         "modalities": [],
         "movement_patterns": [],
         "muscle_groups": [],
