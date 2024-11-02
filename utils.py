@@ -43,6 +43,9 @@ def get_payload(session, access_token, exercise_info, exercise_df):
     modality = exercise_info["modality"]
     if not pd.isna(modality):
         payload["modality"] = MODALITY_MAP.get(str(modality).lower().replace(" ", ""), "")
+    # error
+    if payload["modality"] == "":
+        raise Exception("Modality not recognized.")
 
     # Movement Patterns (optional)
     movement_patterns = []
@@ -54,6 +57,10 @@ def get_payload(session, access_token, exercise_info, exercise_df):
             })
     if movement_patterns:
         payload["movement_patterns"] = movement_patterns
+    # errors
+    for movement_pattern in movement_patterns:
+        if movement_pattern["movement_pattern"] == "":
+            raise Exception("Movement pattern not recognized.")
 
     # Muscle Groups (optional)
     muscle_groups = []
@@ -65,6 +72,10 @@ def get_payload(session, access_token, exercise_info, exercise_df):
             })
     if muscle_groups:
         payload["muscle_groups"] = muscle_groups
+    # errors
+    for muscle_group in muscle_groups:
+        if muscle_group["muscle_group"] == "":
+            raise Exception("Muscle group not recognized.")
 
     # Tracking Fields (optional)
     tracking_fields = exercise_info["tracking_fields"].split(',') if not pd.isna(exercise_info["tracking_fields"]) else []
