@@ -4,7 +4,6 @@ from config import *
 
 import pandas as pd
 import requests
-import time
 import getpass
 
 def main():
@@ -20,45 +19,86 @@ def main():
     5. Handles server load by adding a delay between uploads and ensures session is properly closed.
     """
 
-    # Load excel data in
-    file_path = 'ExerciseData.xlsx'
-    exercise_df = pd.read_excel(file_path)
-
-    # Define start index (first cell under 'EXERCISE NAME' in first column) and get exercise list
-    start_index = exercise_df[exercise_df.iloc[:, 0] == 'EXERCISE NAME'].index[0] + 1
-    exercises_list = get_exercises_list(start_index, exercise_df)
-
-    # Start session
+    # Start a session
     session = requests.Session()
 
-    # Define email and password
-    email = input("Enter your email: ")
-    password = getpass.getpass("Enter your password: ")
-    
-    # Log in and get access token
-    access_token = login(session, email, password)
-    if not access_token:
-        print("Exiting due to failed login.")
-        return
-    else:
-        print("Access token obtained.")
+    try:
+        # Load Excel data
+        file_path = 'ExerciseData.xlsx'
+        try:
+            exercise_df = pd.read_excel(file_path)
+        except FileNotFoundError:
+            print(f"Error: File '{file_path}' not found.")
+            return
+        except Exception as e:
+            print(f"Error reading '{file_path}': {e}")
+            return
 
-    # Add each exercise to Everfit
-    for exercise_info in exercises_list[:]:
-        payload = get_payload(session, access_token, exercise_info, exercise_df)
-        add_exercise_response = add_exercise(session, payload, access_token)
-        if not add_exercise_response:
-            print(f"Failed to add exercise {exercise_info['exercise_name']}")
-            print(add_exercise_response.json())
-            print(add_exercise_response.status_code)
-            print(f"Payload: {payload}")
+        # Find the start index of exercises
+        try:
+            start_index = exercise_df[exercise_df.iloc[:, 0] == 'EXERCISE NAME'].index[0] + 1
+        except IndexError:
+            print("Error: 'EXERCISE NAME' not found in the first column of the Excel file.")
+            return
+        except Exception as e:
+            print(f"Error processing Excel data: {e}")
+            return
+
+        # Get the list of exercises
+        exercises_list = get_exercises_list(start_index, exercise_df)
+        if not exercises_list:
+            print("No exercises found to process.")
+            return
+
+        # Get user credentials
+        try:
+            email = input("Enter your email: ").strip()
+            if not email:
+                print("Email cannot be empty.")
+                return
+            password = getpass.getpass("Enter your password: ").strip()
+            if not password:
+                print("Password cannot be empty.")
+                return
+        except Exception as e:
+            print(f"Error getting user input: {e}")
+            return
+
+        # Log in to the API
+        access_token = login(session, email, password)
+        if not access_token:
+            print("Exiting due to failed login.")
+            return
         else:
-            print(f"Exercise {exercise_info['exercise_name']} added successfully.")
-        # Sleep to not overload server
-        #time.sleep(1)
+            print("Access token obtained.")
 
-    # Close session
-    session.close()
+        # Add each exercise to Everfit
+        for exercise_info in exercises_list:
+            exercise_name = exercise_info.get('exercise_name', 'Unknown')
+            try:
+                payload = get_payload(session, access_token, exercise_info, exercise_df)
+            except Exception as e:
+                print(f"Failed to generate payload for exercise '{exercise_name}': {e}")
+                continue
+
+            try:
+                add_exercise_response = add_exercise(session, payload, access_token)
+            except Exception as e:
+                print(f"Failed to add exercise '{exercise_name}': {e}")
+                continue
+
+            if not add_exercise_response:
+                print(f"Failed to add exercise '{exercise_name}'. No response received.")
+                print(f"Payload: {payload}")
+                continue
+            else:
+                print(f"Exercise '{exercise_name}' added successfully.")
+
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+    finally:
+        # Ensure the session is closed
+        session.close()
 
 if __name__ == "__main__":
     main()

@@ -1,3 +1,5 @@
+import requests
+
 def login(session, email, password):
     """
     Logs into the Everfit API using the provided email and password and retrieves an access token.
@@ -10,6 +12,12 @@ def login(session, email, password):
     Returns:
         str: The access token if login is successful, or None if login fails.
     """
+
+    # Validate inputs
+    if not isinstance(email, str) or not email.strip():
+        raise ValueError("Email must be a non-empty string.")
+    if not isinstance(password, str) or not password.strip():
+        raise ValueError("Password must be a non-empty string.")
 
     # Define url
     url = "https://api-prod3.everfit.io/api/auth/login_lite"
@@ -28,14 +36,25 @@ def login(session, email, password):
     }
 
     # Send a POST request to log in
-    response = session.post(url, json=payload, headers=headers)
-    if response.ok:
-        print("Logged in successfully.")
+    try:
+        response = session.post(url, json=payload, headers=headers, timeout=10)
+        response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        print(f"Login request failed: {e}")
+        return None
+    
+    try:
         data = response.json()
-        access_token = data.get('token')
+    except ValueError as e:
+        print(f"Failed to parse response JSON: {e}")
+        return None
+    
+    access_token = data.get('token')
+    if access_token:
+        print("Logged in successfully.")
         return access_token
     else:
-        print("Login failed:", response.status_code, response.text)
+        print("Login failed: No token found in response.")
         return None
     
 def add_exercise(session, payload, access_token):
@@ -51,6 +70,12 @@ def add_exercise(session, payload, access_token):
         Response: The response object from the POST request.
     """
 
+    # Validate inputs
+    if not isinstance(payload, dict):
+        raise ValueError("Payload must be a dictionary.")
+    if not isinstance(access_token, str) or not access_token.strip():
+        raise ValueError("Access token must be a non-empty string.")
+
     # Define url
     url = "https://api-prod3.everfit.io/api/exercise/add"
 
@@ -62,9 +87,20 @@ def add_exercise(session, payload, access_token):
     }
 
     # Send the POST request to add the exercise
-    response = session.post(url, json=payload, headers=headers)
+    try:
+        response = session.post(url, json=payload, headers=headers, timeout=10)
+        response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        print(f"Failed to add exercise: {e}")
+        return None
 
-    return response
+    try:
+        data = response.json()
+    except ValueError as e:
+        print(f"Failed to parse response JSON: {e}")
+        return None
+
+    return data
 
 def get_exercises(session, access_token):
     """
@@ -77,6 +113,10 @@ def get_exercises(session, access_token):
     Returns:
         dict: The JSON response containing the exercises if successful, or None if the request fails.
     """
+
+    # Validate access_token
+    if not isinstance(access_token, str) or not access_token.strip():
+        raise ValueError("Access token must be a non-empty string.")
 
     total_exercises = 50
 
@@ -108,18 +148,42 @@ def get_exercises(session, access_token):
         "x-app-type": "web-coach",
     }
 
-    # Send a POST request to the url    
-    initial_response = session.post(url, json=payload, headers=headers)
-    if initial_response.ok:
-        print("Exercises retrieved successfully.")
-        total_exercises = initial_response.json()['total']
-        print("Total number of exercises:", total_exercises)
-        payload["per_page"] = total_exercises
-        response = session.post(url, json=payload, headers=headers)
-        return response.json()
-    else:
-        print("Failed to retrieve exercises:", initial_response.status_code, initial_response.text)
+    # Send a POST request to the url   
+    try:
+        initial_response = session.post(url, json=payload, headers=headers, timeout=10)
+        initial_response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        print(f"Failed to retrieve exercises: {e}")
         return None
+    
+    try:
+        initial_data = initial_response.json()
+        total_exercises = initial_data.get('total', 0)
+        if not isinstance(total_exercises, int) or total_exercises <= 0:
+            print("No exercises found.")
+            return None
+    except ValueError as e:
+        print(f"Failed to parse initial response JSON: {e}")
+        return None
+
+    print("Total number of exercises:", total_exercises)
+    payload["per_page"] = total_exercises
+
+    # Send request to get all exercises
+    try:
+        response = session.post(url, json=payload, headers=headers, timeout=30)
+        response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        print(f"Failed to retrieve exercises: {e}")
+        return None
+
+    try:
+        data = response.json()
+    except ValueError as e:
+        print(f"Failed to parse response JSON: {e}")
+        return None
+    
+    return data
 
 def get_tag_list(session, access_token):
     """
@@ -133,9 +197,12 @@ def get_tag_list(session, access_token):
         list: A list of tags if successful, or None if the request fails.
     """
 
+    # Validate access_token
+    if not isinstance(access_token, str) or not access_token.strip():
+        raise ValueError("Access token must be a non-empty string.")
+
     # Define url
-    default_per_page = 20
-    url = "https://api-prod3.everfit.io/api/tag/get-list-tag-by-team?sorter=name&per_page={per_page}&page=1&sort=1&text_search=&type=1"
+    base_url = "https://api-prod3.everfit.io/api/tag/get-list-tag-by-team"
 
     # Define headers
     headers = {
@@ -144,21 +211,51 @@ def get_tag_list(session, access_token):
         "x-app-type": "web-coach",
     }
 
-    # Send a POST request to the url to get total number of tags
-    response = session.get(url.format(per_page=default_per_page), headers=headers)
-    if response.ok:
-        total_tags = response.json()['data']['total']  
-        # Send another POST request to the url to get the tags
-        tag_list_response = session.get(url.format(per_page=total_tags), headers=headers)
-        if tag_list_response.ok:
-            tag_list = tag_list_response.json()['data']['data']
-            return tag_list
-        else:
-            print("Failed to retrieve the full list of tags:", tag_list_response.status_code, tag_list_response.text)
-            return None
-    else:
-        print("Failed to retrieve tags:", response.status_code, response.text)
+    # First request to get total number of tags
+    params = {
+        "sorter": "name",
+        "per_page": 1,  # Get minimal data to retrieve total
+        "page": 1,
+        "sort": 1,
+        "text_search": "",
+        "type": 1
+    }
+
+    try:
+        response = session.get(base_url, headers=headers, params=params, timeout=10)
+        response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        print(f"Failed to retrieve tags: {e}")
         return None
+    
+    try:
+        data = response.json()
+        total_tags = data.get('data', {}).get('total', 0)
+        if not isinstance(total_tags, int) or total_tags <= 0:
+            print("No tags found.")
+            return []
+    except ValueError as e:
+        print(f"Failed to parse response JSON: {e}")
+        return None
+    
+    # Second request to get all tags
+    params['per_page'] = total_tags
+
+    try:
+        tag_list_response = session.get(base_url, headers=headers, params=params, timeout=10)
+        tag_list_response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        print(f"Failed to retrieve the full list of tags: {e}")
+        return None
+
+    try:
+        tag_data = tag_list_response.json()
+        tag_list = tag_data.get('data', {}).get('data', [])
+    except ValueError as e:
+        print(f"Failed to parse tag list JSON: {e}")
+        return None
+
+    return tag_list
     
 def create_new_tag_id(session, access_token, tag):
     """
@@ -173,8 +270,14 @@ def create_new_tag_id(session, access_token, tag):
         str: The ID of the newly created tag if successful, or None if the request fails.
     """
 
+    # Validate inputs
+    if not isinstance(access_token, str) or not access_token.strip():
+        raise ValueError("Access token must be a non-empty string.")
+    if not isinstance(tag, str) or not tag.strip():
+        raise ValueError("Tag name must be a non-empty string.")
+
     # Define url
-    url = "https://api-prod3.everfit.io/api/tag/"
+    url = "https://api-prod3.everfit.io/api/tag"
 
     # Define headers
     headers = {
@@ -185,15 +288,27 @@ def create_new_tag_id(session, access_token, tag):
 
     # Define payload
     payload = {
-        "name": tag,
+        "name": tag.strip(),
         "type": 1
     }
 
     # Send a POST request to the url to make a new tag
-    response = session.post(url, json=payload, headers=headers)
-    if response.ok:
-        data = response.json()['data']
-        return data["_id"]
-    else:
-        print("Failed to make new tag:", response.status_code, response.text)
+    try:
+        response = session.post(url, json=payload, headers=headers, timeout=10)
+        response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        print(f"Failed to create new tag '{tag}': {e}")
         return None
+
+    try:
+        data = response.json()
+        tag_data = data.get('data', {})
+        tag_id = tag_data.get('_id')
+        if not tag_id:
+            print(f"Failed to get new tag ID from response.")
+            return None
+    except ValueError as e:
+        print(f"Failed to parse response JSON: {e}")
+        return None
+
+    return tag_id

@@ -16,7 +16,8 @@ MODALITY_MAP = {
     "mobility": "66013e83b117d35345209b01",
     "myofascial Release": "66013e83b117d35345209b05",
     "power": "66013e83b117d35345209b03",
-    "strength": "66013e83b117d35345209b04"
+    "strength": "66013e83b117d35345209b04",
+    "yoga": "66013e83b117d35345209b06"
 }
 
 # Movement Patterns

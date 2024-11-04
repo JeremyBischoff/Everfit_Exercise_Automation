@@ -3,6 +3,19 @@ from api import *
 
 import pandas as pd
 
+# Helper function to safely get string values
+def safe_str(value, default=""):
+    if pd.isna(value) or value is None:
+        return default
+    return str(value)
+
+# Helper function to safely get DataFrame values
+def safe_get(df, index, column, default=None):
+    if column in df.columns:
+        value = df.at[index, column]
+        return value if not pd.isna(value) else default
+    return default
+
 def get_payload(session, access_token, exercise_info, exercise_df):
     """
 
@@ -21,8 +34,8 @@ def get_payload(session, access_token, exercise_info, exercise_df):
     payload = {
         "author": "666c67f6c98eb80026f047c9",
         "author_name": "Ruben Lopez Martinez", 
-        "title": exercise_info["exercise_name"],
-        "instructions": [] if pd.isna(exercise_info["instructions"]) else str(exercise_info["instructions"]).split('\n'),
+        "title": safe_str(exercise_info.get("exercise_name")),
+        "instructions": [] if pd.isna(exercise_info["instructions"]) else safe_str(exercise_info["instructions"]).split('\n'),
         "fields": [],
         "link": "",
         "modality": "66013e83b117d35345209b07",
@@ -31,72 +44,94 @@ def get_payload(session, access_token, exercise_info, exercise_df):
         "picture": [],
         "thumbnail_url": "",
         "video": "",
-        "videoLink": "" if pd.isna(exercise_info.get("video_link", "")) else exercise_info.get("video_link", ""),
+        "videoLink": "" if pd.isna(exercise_info.get("video_link", "")) else safe_str(exercise_info.get("video_link", "")),
     }
     
     # Category Type (required)
     category = exercise_info.get("category", "strength")
-    payload["category_type"] = CATEGORY_TYPE_MAP.get(str(category).lower().replace(" ", ""), "5cd912c319ae01d22ea76012") # else its the strength category id
-    payload["category_type_name"] = "strength" if pd.isna(category) else category
+    if pd.isna(category) or category is None:
+        category = "strength"
+    category_key = safe_str(category).lower().replace(" ", "")
+    payload["category_type"] = CATEGORY_TYPE_MAP.get(category_key, "5cd912c319ae01d22ea76012") # else its the strength category id
+    payload["category_type_name"] = category
 
     # Modality (optional, but has default)
-    modality = exercise_info["modality"]
-    if not pd.isna(modality):
-        payload["modality"] = MODALITY_MAP.get(str(modality).lower().replace(" ", ""), "")
-    # error
-    if payload["modality"] == "":
-        raise Exception("Modality not recognized.")
+    modality = exercise_info.get("modality")
+    if not pd.isna(modality) and modality is not None:
+        modality_key = safe_str(modality).lower().replace(" ", "")
+        payload["modality"] = MODALITY_MAP.get(modality_key, "")
+        # error
+        if payload["modality"] == "":
+            raise Exception(f"Modality {modality} not recognized.")
 
     # Movement Patterns (optional)
     movement_patterns = []
-    for idx, pattern in enumerate(exercise_info["movement_patterns"]):
-        if not pd.isna(pattern):
-            movement_patterns.append({
-                "is_primary": idx == 0,
-                "movement_pattern": MOVEMENT_PATTERN_MAP.get(str(pattern).lower().replace(" ", ""), "")
-            })
+    for idx, pattern in enumerate(exercise_info.get("movement_patterns", [])):
+
+        if pd.isna(pattern) or pattern is None or pattern == "":
+            continue
+
+        pattern_key = safe_str(pattern).lower().replace(" ", "")
+        movement_pattern_id = MOVEMENT_PATTERN_MAP.get(pattern_key, "")
+        if movement_pattern_id == "":
+            raise Exception(f"Movement pattern '{pattern}' not recognized.")
+        elif any(d['movement_pattern'] == movement_pattern_id for d in movement_patterns):
+            continue
+        movement_patterns.append({
+            "is_primary": idx == 0,
+            "movement_pattern": movement_pattern_id
+        })
     if movement_patterns:
         payload["movement_patterns"] = movement_patterns
-    # errors
-    for movement_pattern in movement_patterns:
-        if movement_pattern["movement_pattern"] == "":
-            raise Exception("Movement pattern not recognized.")
 
     # Muscle Groups (optional)
     muscle_groups = []
-    for idx, muscle in enumerate(exercise_info["muscle_groups"]):
-        if not pd.isna(muscle):
-            muscle_groups.append({
-                "is_primary": idx == 0,
-                "muscle_group": MUSCLE_GROUP_MAP.get(str(muscle).lower().replace(" ", ""), "")
-            })
+    for idx, muscle in enumerate(exercise_info.get("muscle_groups", [])):
+        if pd.isna(muscle) or muscle is None or muscle == "":
+            continue
+        muscle_key = safe_str(muscle).lower().replace(" ", "")
+        muscle_group_id = MUSCLE_GROUP_MAP.get(muscle_key, "")
+        if muscle_group_id == "":
+            raise Exception(f"Muscle group '{muscle}' not recognized.")
+        elif any(d['muscle_group'] == muscle_group_id for d in muscle_groups):
+            continue
+        muscle_groups.append({
+            "is_primary": idx == 0,
+            "muscle_group": muscle_group_id
+        })
     if muscle_groups:
         payload["muscle_groups"] = muscle_groups
-    # errors
-    for muscle_group in muscle_groups:
-        if muscle_group["muscle_group"] == "":
-            raise Exception("Muscle group not recognized.")
 
     # Tracking Fields (optional)
-    tracking_fields = exercise_info["tracking_fields"].split(',') if not pd.isna(exercise_info["tracking_fields"]) else []
-    for i in range(len(tracking_fields)):
-        payload["fields"].append(TRACKING_FIELDS_MAP.get(str(tracking_fields[i]).lower().replace(" ", ""), ""))
-    payload["fields"].append("5cd912bb19ae01d22ea76011")  # they always add this "Rest" one at the end for some reason
+    tracking_fields_str = exercise_info.get("tracking_fields", "")
+    tracking_fields = []
+    if not pd.isna(tracking_fields_str) and tracking_fields_str is not None:
+        tracking_fields = [field.strip() for field in safe_str(tracking_fields_str).split(',') if field.strip()]
+    for field in tracking_fields:
+        field_key = field.lower().replace(" ", "")
+        field_id = TRACKING_FIELDS_MAP.get(field_key, "")
+        if field_id:
+            payload["fields"].append(field_id)
+    # Always add the "Rest" field
+    payload["fields"].append("5cd912bb19ae01d22ea76011")
     
     # Tags
     tags = []
     requested_tags = get_requested_tags(exercise_df, exercise_info)
-    tag_list = get_tag_list(session, access_token)
+    tag_list = get_tag_list(session, access_token) or []
     tag_mappings = create_tag_mappings(tag_list)
 
     # Add or create tag id
+    seen_tags = []
     for requested_tag in requested_tags:
+        if requested_tag == "" or requested_tag is None or requested_tag in seen_tags:
+            continue
         if requested_tag in tag_mappings:
             tag_id = tag_mappings[requested_tag]
-            tags.append(tag_id)
         else:
             tag_id = create_new_tag_id(session, access_token, requested_tag)
-            tags.append(tag_id)
+        tags.append(tag_id)
+        seen_tags.append(requested_tag)
     payload["tags"] = tags
 
     return payload
@@ -122,109 +157,110 @@ def get_exercises_list(start_index, exercise_df):
         if pd.isna(exercise_df.iloc[i, 0]):
             break
         
-        # Moves to next if video status is a 2 (already uploaded into Everfit) or 0 (not ready)
-        if exercise_df.iloc[i, 1] != 1:
+        # Continue if video status is not 1
+        video_status = safe_get(exercise_df, i, "VIDEO STATUS", 0)
+        if video_status != 1:
             continue
         
         # Creates a dictionary of exercise info
         exercise_info = {
-            "exercise_name": exercise_df.at[i, "EXERCISE NAME"],
-            "video_status": exercise_df.at[i, "VIDEO STATUS"],
-            "description":  exercise_df.at[i, "Description"],
-            "modality":  exercise_df.at[i, "Modality"],
+            "exercise_name": safe_get(exercise_df, i, "EXERCISE NAME", ""),
+            "video_status": video_status,
+            "description": safe_get(exercise_df, i, "EXERCISE NAME", ""),
+            "modality": safe_get(exercise_df, i, "Modality", ""),
             "muscle_groups": [
-                exercise_df.at[i, "Muscle group"],
-                exercise_df.at[i, "Muscle group 2"],
-                exercise_df.at[i, "Muscle group 3"]
+                safe_get(exercise_df, i, "Muscle group", ""),
+                safe_get(exercise_df, i, "Muscle group 2", ""),
+                safe_get(exercise_df, i, "Muscle group 3", "")
             ],
             "movement_patterns":  [
-                exercise_df.at[i, "Movement pattern 1"],
-                exercise_df.at[i, "Movement pattern 2"],
-                exercise_df.at[i, "Movement pattern 3"]
+                safe_get(exercise_df, i, "Movement pattern 1", ""),
+                safe_get(exercise_df, i, "Movement pattern 2", ""),
+                safe_get(exercise_df, i, "Movement pattern 3", "")
             ],
-            "category":  exercise_df.at[i, "Category"],
-            "tracking_fields":  exercise_df.at[i, "Tracking fields"],
-            "instructions": exercise_df.at[i, "Instructions"],
-            "video_link": exercise_df.at[i, "Video link"],
+            "category": safe_get(exercise_df, i, "Category", "strength"),
+            "tracking_fields": safe_get(exercise_df, i, "Tracking fields", ""),
+            "instructions": safe_get(exercise_df, i, "Instructions", ""),
+            "video_link": safe_get(exercise_df, i, "Video link", ""),
             "tags": {
-                "exercise_level_1": exercise_df.at[i, "Basic"],
-                "exercise_level_2": exercise_df.at[i, "Intermediate"],
-                "exercise_level_3": exercise_df.at[i, "Advanced"],
-                "skill_name_1": exercise_df.at[i, "SKILL NAME 1"],
-                "skill_name_2": exercise_df.at[i, "SKILL NAME 2"],
-                "skill_name_3": exercise_df.at[i, "SKILL NAME 3"],
-                "calisthenics": exercise_df.at[i, "Calisthenics"],
-                "wx_athlete": exercise_df.at[i, "WX Athlete"],
-                "hp_gymnast": exercise_df.at[i, "HP gymnast"],
-                "equipment_1": exercise_df.at[i, "EQUIPMENT 1"],
-                "equipment_2": exercise_df.at[i, "EQUIPMENT 2"],
-                "equipment_3": exercise_df.at[i, "EQUIPMENT 3"],
-                "equipment_4": exercise_df.at[i, "EQUIPMENT 4"],
-                "warm_up": exercise_df.at[i, "Warm up"],
-                "cardio": exercise_df.at[i, "Cardio"],
-                "crossfit_lift": exercise_df.at[i, "Crossfit lift"],
-                "bodyweight": exercise_df.at[i, "Bodyweight"],
-                "weight": exercise_df.at[i, "Weight"],
-                "band_resistance": exercise_df.at[i, "Band resistance"],
-                "weightlifting": exercise_df.at[i, "Weightlifting"],
-                "mobility": exercise_df.at[i, "mobility"],
-                "active": exercise_df.at[i, "active"],
-                "passive": exercise_df.at[i, "passive"],
-                "stretching": exercise_df.at[i, "stretching"],
-                "upperbody": exercise_df.at[i, "Upperbody"],
-                "lowerbody": exercise_df.at[i, "Lowerbody"],
-                "core": exercise_df.at[i, "Core"],
-                "push": exercise_df.at[i, "Push"],
-                "pull": exercise_df.at[i, "Pull"],
-                "arms_straight": exercise_df.at[i, "Arms straight"],
-                "arms_bend": exercise_df.at[i, "Arms bend"],
-                "iso": exercise_df.at[i, "Iso"],
-                "plyo": exercise_df.at[i, "Plyo"],
-                "set": exercise_df.at[i, "Set"],
-                "shoulders": exercise_df.at[i, "Shoulders"],
-                "pecs": exercise_df.at[i, "Pecs"],
-                "triceps": exercise_df.at[i, "Triceps"],
-                "biceps": exercise_df.at[i, "Biceps"],
-                "back": exercise_df.at[i, "Back"],
-                "abs": exercise_df.at[i, "Abs"],
-                "lower_back": exercise_df.at[i, "Lower back"],
-                "obliques": exercise_df.at[i, "Obliques"],
-                "glute": exercise_df.at[i, "Glute"],
-                "quads": exercise_df.at[i, "Quads"],
-                "hamstrings": exercise_df.at[i, "Hamstrings"],
-                "calves": exercise_df.at[i, "Calves"],
-                "wrist": exercise_df.at[i, "Wrist"],
-                "hips": exercise_df.at[i, "Hips"],
-                "elbows": exercise_df.at[i, "Elbows"],
-                "ankle": exercise_df.at[i, "Ankle"],
-                "thoracic": exercise_df.at[i, "Thoracic"],
-                "forearms": exercise_df.at[i, "Forearms"],
-                "neck": exercise_df.at[i, "Neck"],
-                "pull_up": exercise_df.at[i, "Pull up"],
-                "push_up": exercise_df.at[i, "Push up"],
-                "dip": exercise_df.at[i, "Dip"],
-                "row": exercise_df.at[i, "Row"],
-                "press": exercise_df.at[i, "Press"],
-                "curl": exercise_df.at[i, "Curl"],
-                "squat": exercise_df.at[i, "Squat"],
-                "bridge": exercise_df.at[i, "Bridge"],
-                "throws": exercise_df.at[i, "Throws"],
-                "slams": exercise_df.at[i, "Slams"],
-                "sit_up": exercise_df.at[i, "Sit up"],
-                "leg_lift": exercise_df.at[i, "Leg lift"],
-                "balance": exercise_df.at[i, "Balance"],
-                "raise": exercise_df.at[i, "Raise"],
-                "rocks": exercise_df.at[i, "Rocks"],
-                "arch-hollow_shape": exercise_df.at[i, "Arch-hollow shape"],
-                "rotation": exercise_df.at[i, "Rotation"],
-                "gymnastics_skill": exercise_df.at[i, "Gymnastics skill"],
-                "plank": exercise_df.at[i, "Plank"],
-                "preS_explosive": exercise_df.at[i, "PreS explosive"],
-                "preS_legs": exercise_df.at[i, "PreS legs"],
-                "postS_legs": exercise_df.at[i, "PostS legs"],
-                "postS_rings": exercise_df.at[i, "PostS rings"],
-                "postS_altern_rings": exercise_df.at[i, "PostS altern rings"],
-                "postS_weights": exercise_df.at[i, "PostS weights"],
+                "exercise_level_1": safe_get(exercise_df, i, "Basic", 0),
+                "exercise_level_2": safe_get(exercise_df, i, "Intermediate", 0),
+                "exercise_level_3": safe_get(exercise_df, i, "Advanced", 0),
+                "skill_name_1": safe_get(exercise_df, i, "SKILL NAME 1", ""), 
+                "skill_name_2": safe_get(exercise_df, i, "SKILL NAME 2", ""), 
+                "skill_name_3": safe_get(exercise_df, i, "SKILL NAME 3", ""), 
+                "calisthenics": safe_get(exercise_df, i, "Calisthenics", 0),
+                "wx_athlete": safe_get(exercise_df, i, "WX Athlete", 0),
+                "hp_gymnast": safe_get(exercise_df, i, "HP gymnast", 0),
+                "equipment_1": safe_get(exercise_df, i, "EQUIPMENT 1", ""), 
+                "equipment_2": safe_get(exercise_df, i, "EQUIPMENT 2", ""), 
+                "equipment_3": safe_get(exercise_df, i, "EQUIPMENT 3", ""), 
+                "equipment_4": safe_get(exercise_df, i, "EQUIPMENT 4", ""), 
+                "warm_up": safe_get(exercise_df, i, "Warm up", 0),
+                "cardio": safe_get(exercise_df, i, "Cardio", 0),
+                "crossfit_lift": safe_get(exercise_df, i, "Crossfit lift", 0),
+                "bodyweight": safe_get(exercise_df, i, "Bodyweight", 0),
+                "weight": safe_get(exercise_df, i, "Weight", 0),
+                "band_resistance": safe_get(exercise_df, i, "Band resistance", 0),
+                "weightlifting": safe_get(exercise_df, i, "Weightlifting", 0),
+                "mobility": safe_get(exercise_df, i, "mobility", 0),
+                "active": safe_get(exercise_df, i, "active", 0),
+                "passive": safe_get(exercise_df, i, "passive", 0),
+                "stretching": safe_get(exercise_df, i, "stretching", 0),
+                "upperbody": safe_get(exercise_df, i, "Upperbody", 0),
+                "lowerbody": safe_get(exercise_df, i, "Lowerbody", 0),
+                "core": safe_get(exercise_df, i, "Core", 0),
+                "push": safe_get(exercise_df, i, "Push", 0),
+                "pull": safe_get(exercise_df, i, "Pull", 0),
+                "arms_straight": safe_get(exercise_df, i, "Arms straight", 0),
+                "arms_bend": safe_get(exercise_df, i, "Arms bend", 0),
+                "iso": safe_get(exercise_df, i, "Iso", 0),
+                "plyo": safe_get(exercise_df, i, "Plyo", 0),
+                "set": safe_get(exercise_df, i, "Set", 0),
+                "shoulders": safe_get(exercise_df, i, "Shoulders", 0),
+                "pecs": safe_get(exercise_df, i, "Pecs", 0),
+                "triceps": safe_get(exercise_df, i, "Triceps", 0),
+                "biceps": safe_get(exercise_df, i, "Biceps", 0),
+                "back": safe_get(exercise_df, i, "Back", 0),
+                "abs": safe_get(exercise_df, i, "Abs", 0),
+                "lower_back": safe_get(exercise_df, i, "Lower back", 0),
+                "obliques": safe_get(exercise_df, i, "Obliques", 0),
+                "glute": safe_get(exercise_df, i, "Glutes", 0),
+                "quads": safe_get(exercise_df, i, "Quads", 0),
+                "hamstrings": safe_get(exercise_df, i, "Hamstrings", 0),
+                "calves": safe_get(exercise_df, i, "Calves", 0),
+                "wrist": safe_get(exercise_df, i, "Wrist", 0),
+                "hips": safe_get(exercise_df, i, "Hips", 0),
+                "elbows": safe_get(exercise_df, i, "Elbows", 0),
+                "ankle": safe_get(exercise_df, i, "Ankle", 0),
+                "thoracic": safe_get(exercise_df, i, "Thoracic", 0),
+                "forearms": safe_get(exercise_df, i, "Forearms", 0),
+                "neck": safe_get(exercise_df, i, "Neck", 0),
+                "pull_up": safe_get(exercise_df, i, "Pull up", 0),
+                "push_up": safe_get(exercise_df, i, "Push up", 0),
+                "dip": safe_get(exercise_df, i, "Dip", 0),
+                "row": safe_get(exercise_df, i, "Row", 0),
+                "press": safe_get(exercise_df, i, "Press", 0),
+                "curl": safe_get(exercise_df, i, "Curl", 0),
+                "squat": safe_get(exercise_df, i, "Squat", 0),
+                "bridge": safe_get(exercise_df, i, "Bridge", 0),
+                "throws": safe_get(exercise_df, i, "Throws", 0),
+                "slams": safe_get(exercise_df, i, "Slams", 0),
+                "sit_up": safe_get(exercise_df, i, "Sit up", 0),
+                "leg_lift": safe_get(exercise_df, i, "Leg lift", 0),
+                "balance": safe_get(exercise_df, i, "Balance", 0),
+                "raise": safe_get(exercise_df, i, "Raise", 0),
+                "rocks": safe_get(exercise_df, i, "Rocks", 0),
+                "arch-hollow_shape": safe_get(exercise_df, i, "Arch-hollow shape", 0),
+                "rotation": safe_get(exercise_df, i, "Rotation", 0),
+                "gymnastics_skill": safe_get(exercise_df, i, "Gymnastics skill", 0),
+                "plank": safe_get(exercise_df, i, "Plank", 0),
+                "preS_explosive": safe_get(exercise_df, i, "PreS explosive", 0),
+                "preS_legs": safe_get(exercise_df, i, "PreS legs", 0),
+                "postS_legs": safe_get(exercise_df, i, "PostS legs", 0),
+                "postS_rings": safe_get(exercise_df, i, "PostS rings", 0),
+                "postS_altern_rings": safe_get(exercise_df, i, "PostS altern rings", 0),
+                "postS_weights": safe_get(exercise_df, i, "PostS weights", 0),
             }  
         }
 
@@ -264,10 +300,10 @@ def get_requested_tags(exercise_df, exercise_info):
     requested_tags = []
     cur_tag_col = 12
     # Goes through each tag, adding the proper tag name to the list
-    for key, val in exercise_info['tags'].items():
+    for key, val in exercise_info.get('tags', {}).items():
         cur_tag_col += 1
         # Skip if na or 0
-        if pd.isna(val) or val == 0:
+        if pd.isna(val) or val == 0 or val is None or val == "":
             continue
         # Add row name if integer, else add the value
         if isinstance(val, int):
