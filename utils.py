@@ -124,6 +124,7 @@ def get_payload(session, access_token, exercise_info, exercise_df):
     # Add or create tag id
     seen_tags = []
     for requested_tag in requested_tags:
+        requested_tag = str(requested_tag)
         if requested_tag == "" or requested_tag is None or requested_tag in seen_tags:
             continue
         if requested_tag in tag_mappings:
@@ -298,17 +299,22 @@ def get_requested_tags(exercise_df, exercise_info):
         list: A list of tag names associated with the exercise.
     """
     requested_tags = []
-    cur_tag_col = 12
+    string_cols = ["SKILL NAME 1", "SKILL NAME 2", "SKILL NAME 3", "EQUIPMENT 1", "EQUIPMENT 2", "EQUIPMENT 3", "EQUIPMENT 4"]
+    col_names = exercise_df.columns.tolist()
+    cur_tag_col = col_names.index("Basic")
+
     # Goes through each tag, adding the proper tag name to the list
     for key, val in exercise_info.get('tags', {}).items():
-        cur_tag_col += 1
+        col_name = col_names[cur_tag_col]
         # Skip if na or 0
         if pd.isna(val) or val == 0 or val is None or val == "":
+            cur_tag_col += 1
             continue
-        # Add row name if integer, else add the value
-        if isinstance(val, int):
-            col_name = exercise_df.iloc[1, cur_tag_col]
-            requested_tags.append(col_name)
-        else:
+        # Add value if in string_cols, else add col name
+        if col_name in string_cols:
             requested_tags.append(val)
+        else:
+            requested_tags.append(col_name)
+        cur_tag_col += 1
+            
     return requested_tags
