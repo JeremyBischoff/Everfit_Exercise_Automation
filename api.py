@@ -37,7 +37,7 @@ def login(session, email, password):
 
     # Send a POST request to log in
     try:
-        response = session.post(url, json=payload, headers=headers, timeout=10)
+        response = session.post(url, json=payload, headers=headers, timeout=30)
         response.raise_for_status()
     except requests.exceptions.RequestException as e:
         print(f"Login request failed: {e}")
@@ -57,7 +57,41 @@ def login(session, email, password):
         print("Login failed: No token found in response.")
         return None
     
-def add_exercise(session, payload, access_token):
+def put_exercise(session, access_token, exercise_id, payload):
+
+    # Validate inputs
+    if not isinstance(payload, dict):
+        raise ValueError("Payload must be a dictionary.")
+    if not isinstance(access_token, str) or not access_token.strip():
+        raise ValueError("Access token must be a non-empty string.")    
+    
+    # Define url
+    url = "https://api-prod3.everfit.io/api/exercise/update/" + exercise_id
+
+    # Define headers
+    headers = {
+        "Content-Type": "application/json;charset=UTF-8",
+        "X-Access-Token": access_token,
+        "X-App-Type": "web-coach",
+    }
+
+    # Send the PUT request to update the exercise
+    try:
+        response = session.put(url, json=payload, headers=headers, timeout=30)
+        response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        print(f"Failed to update exercise: {e}")
+        return None
+
+    try:
+        data = response.json()
+    except ValueError as e:
+        print(f"Failed to parse response JSON: {e}")
+        return None
+
+    return data
+
+def post_exercise(session, payload, access_token):
     """
     Sends a POST request to the Everfit API to add a new exercise.
 
@@ -88,7 +122,7 @@ def add_exercise(session, payload, access_token):
 
     # Send the POST request to add the exercise
     try:
-        response = session.post(url, json=payload, headers=headers, timeout=10)
+        response = session.post(url, json=payload, headers=headers, timeout=30)
         response.raise_for_status()
     except requests.exceptions.RequestException as e:
         print(f"Failed to add exercise: {e}")
@@ -150,7 +184,7 @@ def get_exercises(session, access_token):
 
     # Send a POST request to the url   
     try:
-        initial_response = session.post(url, json=payload, headers=headers, timeout=10)
+        initial_response = session.post(url, json=payload, headers=headers, timeout=30)
         initial_response.raise_for_status()
     except requests.exceptions.RequestException as e:
         print(f"Failed to retrieve exercises: {e}")
@@ -166,7 +200,6 @@ def get_exercises(session, access_token):
         print(f"Failed to parse initial response JSON: {e}")
         return None
 
-    print("Total number of exercises:", total_exercises)
     payload["per_page"] = total_exercises
 
     # Send request to get all exercises
@@ -183,7 +216,7 @@ def get_exercises(session, access_token):
         print(f"Failed to parse response JSON: {e}")
         return None
     
-    return data
+    return data['data']
 
 def get_tag_list(session, access_token):
     """
@@ -222,7 +255,7 @@ def get_tag_list(session, access_token):
     }
 
     try:
-        response = session.get(base_url, headers=headers, params=params, timeout=10)
+        response = session.get(base_url, headers=headers, params=params, timeout=30)
         response.raise_for_status()
     except requests.exceptions.RequestException as e:
         print(f"Failed to retrieve tags: {e}")
@@ -242,7 +275,7 @@ def get_tag_list(session, access_token):
     params['per_page'] = total_tags
 
     try:
-        tag_list_response = session.get(base_url, headers=headers, params=params, timeout=10)
+        tag_list_response = session.get(base_url, headers=headers, params=params, timeout=30)
         tag_list_response.raise_for_status()
     except requests.exceptions.RequestException as e:
         print(f"Failed to retrieve the full list of tags: {e}")
@@ -294,7 +327,7 @@ def create_new_tag_id(session, access_token, tag):
 
     # Send a POST request to the url to make a new tag
     try:
-        response = session.post(url, json=payload, headers=headers, timeout=10)
+        response = session.post(url, json=payload, headers=headers, timeout=30)
         response.raise_for_status()
     except requests.exceptions.RequestException as e:
         print(f"Failed to create new tag '{tag}': {e}")

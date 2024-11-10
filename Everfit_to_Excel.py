@@ -7,7 +7,7 @@ import getpass
 import pandas as pd
 import json
 
-def get_tags_from_exercise_data(tag_list):
+def tags_from_exercise_data(tag_list):
     tags = []
     for tag in tag_list:
         tags.append(tag['name'])
@@ -42,16 +42,16 @@ def add_exercises_to_excel(exercise_df, exercise_info_list, start_row_index):
     
     return exercise_df
 
-def fetch_individual_exercise_details(response, session, headers):
+def get_individual_exercise_details(exercises_data, session, headers):
     # Used for getting each individual exercise details (base + exercise id)
     base_url = "https://api-prod3.everfit.io/api/exercise/detail/"
 
     # Data to return
     data = []
-    total_exercises = len(response['data'])
+    total_exercises = len(exercises_data)
     i = 1
 
-    for exercise in reversed(response['data'][:]):
+    for exercise in reversed(exercises_data[:]):
         # get id and request details
         detail_url = base_url + exercise['_id']
         detail_response = session.get(detail_url, headers=headers)
@@ -76,7 +76,7 @@ def fetch_individual_exercise_details(response, session, headers):
                 "Tracking fields": ', '.join([REVERSE_TRACKING_FIELDS_MAP.get(field_id, 'Unknown').capitalize() for field_id in exercise_data['fields'][:-1]]),
                 "Instructions": '\r\n'.join(exercise_data.get('instructions', [])),
                 "Video link": exercise_data.get('videoLink', ""),
-                "Tags": get_tags_from_exercise_data(exercise_data.get('tags', []))
+                "Tags": tags_from_exercise_data(exercise_data.get('tags', []))
             }
             i += 1
             data.append(exercise_info)
@@ -106,10 +106,10 @@ def main():
     }
 
     # Gets all exercises in Everfit exercise library
-    response = get_exercises(session, access_token)
+    exercises_data = get_exercises(session, access_token)
 
     # Create data from individual exercise details
-    data = fetch_individual_exercise_details(response, session, headers)
+    data = get_individual_exercise_details(exercises_data, session, headers)
 
     # Load existing blank template Excel sheet
     file_path = 'BlankExerciseData.xlsx' 

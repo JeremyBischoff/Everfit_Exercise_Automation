@@ -56,8 +56,10 @@ def get_payload(session, access_token, exercise_info, exercise_df):
     payload["category_type_name"] = category
 
     # Modality (optional, but has default)
-    modality = exercise_info.get("modality")
+    modality = exercise_info.get("modality", "")
     if not pd.isna(modality) and modality is not None:
+        if modality.strip() == "":
+            modality = "empty"
         modality_key = safe_str(modality).lower().replace(" ", "")
         payload["modality"] = MODALITY_MAP.get(modality_key, "")
         # error
@@ -81,8 +83,7 @@ def get_payload(session, access_token, exercise_info, exercise_df):
             "is_primary": idx == 0,
             "movement_pattern": movement_pattern_id
         })
-    if movement_patterns:
-        payload["movement_patterns"] = movement_patterns
+    payload["movement_patterns"] = movement_patterns
 
     # Muscle Groups (optional)
     muscle_groups = []
@@ -99,8 +100,7 @@ def get_payload(session, access_token, exercise_info, exercise_df):
             "is_primary": idx == 0,
             "muscle_group": muscle_group_id
         })
-    if muscle_groups:
-        payload["muscle_groups"] = muscle_groups
+    payload["muscle_groups"] = muscle_groups
 
     # Tracking Fields (optional)
     tracking_fields_str = exercise_info.get("tracking_fields", "")
@@ -137,7 +137,7 @@ def get_payload(session, access_token, exercise_info, exercise_df):
 
     return payload
 
-def get_exercises_list(start_index, exercise_df):
+def get_exercises_list(start_index, exercise_df, post_exercises_flag=True, put_exercises_flag=False, end_index=-1):
     """
     Extracts a list of exercises and their associated information from a DataFrame.
 
@@ -152,15 +152,21 @@ def get_exercises_list(start_index, exercise_df):
     # Creates a list of exercises with information
     exercises_list = []
 
+    if end_index == -1:
+        end_index = len(exercise_df)
+
     # Goes through each cell with an exercise, adding info to list of exercises
-    for i in range(start_index, len(exercise_df)):
+    for i in range(start_index, min(len(exercise_df), end_index+1)):
         # Breaks if at end
         if pd.isna(exercise_df.iloc[i, 0]):
             break
         
         # Continue if video status is not 1
         video_status = safe_get(exercise_df, i, "VIDEO STATUS", 0)
-        if video_status != 1:
+        if post_exercises_flag and video_status != 1:
+            continue
+        # To update exercises
+        elif put_exercises_flag and video_status != 3:
             continue
         
         # Creates a dictionary of exercise info

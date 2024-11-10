@@ -6,6 +6,12 @@ import pandas as pd
 import requests
 import getpass
 
+# Steps:
+# 1. Write out exercises and exercise information in ExcelData.xlsx (
+#   * 1 in "VIDEO STATUS" to add exercise, 3 to update exercise
+# 2. Translate instructions from Spanish to English with translate_instructions.py
+# 3. Add/update exercises from ExcelData.xlsx to Everfit application with main.py
+
 def main():
     """
     Main function that coordinates the process of reading exercise data from an Excel file,
@@ -15,7 +21,7 @@ def main():
     1. Loads exercise data from 'ExerciseData.xlsx'.
     2. Logs into the Everfit API using provided credentials and retrieves an access token.
     3. Constructs a list of exercises from the loaded data.
-    4. Uploads the last 3 exercises from the list to the Everfit API using the generated payload.
+    4. Uploads the exercises from the list to the Everfit API using the generated payload.
     5. Handles server load by adding a delay between uploads and ensures session is properly closed.
     """
 
@@ -24,7 +30,7 @@ def main():
 
     try:
         # Load Excel data
-        file_path = 'ExerciseData.xlsx'
+        file_path = input("Name of file: ").strip()
         try:
             exercise_df = pd.read_excel(file_path)
         except FileNotFoundError:
@@ -42,12 +48,6 @@ def main():
             return
         except Exception as e:
             print(f"Error processing Excel data: {e}")
-            return
-
-        # Get the list of exercises
-        exercises_list = get_exercises_list(start_index, exercise_df)
-        if not exercises_list:
-            print("No exercises found to process.")
             return
 
         # Get user credentials
@@ -72,32 +72,75 @@ def main():
         else:
             print("Access token obtained.")
 
-        # Add each exercise to Everfit
-        for exercise_info in exercises_list:
+        # Get the list of POST exercises
+        post_exercises_list = get_exercises_list(start_index, exercise_df, post_exercises_flag=True)
+        if not post_exercises_list:
+            print("No exercises found to add.")
+
+        # POST each exercise to Everfit
+        for exercise_info in post_exercises_list:
+            # Get payload to add exercise
             exercise_name = exercise_info.get('exercise_name', 'Unknown')
             try:
                 payload = get_payload(session, access_token, exercise_info, exercise_df)
             except Exception as e:
                 print(f"Failed to generate payload for exercise '{exercise_name}': {e}")
                 continue
-
+            # Network call to add exercise
             try:
-                add_exercise_response = add_exercise(session, payload, access_token)
+                post_exercise_response = post_exercise(session, payload, access_token)
             except Exception as e:
                 print(f"Failed to add exercise '{exercise_name}': {e}")
                 continue
-
-            if not add_exercise_response:
+            # Debugging purposes
+            if not post_exercise_response:
                 print(f"Failed to add exercise '{exercise_name}'. No response received.")
                 print(f"Payload: {payload}")
                 continue
             else:
                 print(f"Exercise '{exercise_name}' added successfully.")
 
+        # Get the list of PUT exercises
+        put_exercises_list = get_exercises_list(start_index, exercise_df, post_exercises_flag=False, put_exercises_flag=True)
+        if not put_exercises_list:
+            print("No exercises found to update.")
+
+        # PUT each exercise to Everfit
+        for exercise_info in put_exercises_list:
+            # Get payload to update exercise
+            exercise_name = exercise_info.get('exercise_name', 'Unknown')
+            try:
+                payload = get_payload(session, access_token, exercise_info, exercise_df)
+            except Exception as e:
+                print(f"Failed to generate payload for exercise '{exercise_name}': {e}")
+                continue
+            # Get exercise id of exercise
+            exercise_id = ""
+            everfit_exercises_data = get_exercises(session, access_token)
+            for exercise_data in everfit_exercises_data:
+                if exercise_data['title'].strip().lower() == payload['title'].strip().lower():
+                    exercise_id = exercise_data['_id']
+                    break
+            if exercise_id == "":
+                print(f"Exercise '{exercise_name}' not found in Everfit application. Please add the exercise before attempting to update it.")
+                continue
+            # Network call to update exercise
+            try:
+                put_exercise_response = put_exercise(session, access_token, exercise_id, payload)
+            except Exception as e:
+                print(f"Failed to update exercise '{exercise_name}': {e}")
+                continue
+            # Debugging purposes
+            if not put_exercise_response:
+                print(f"Failed to update exercise '{exercise_name}'. No response received.")
+                print(f"Payload: {payload}")
+                continue
+            else:
+                print(f"Exercise '{exercise_name}' updated successfully.")
+
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
     finally:
-        # Ensure the session is closed
         session.close()
 
 if __name__ == "__main__":
