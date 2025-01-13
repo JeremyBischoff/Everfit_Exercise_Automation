@@ -74,6 +74,15 @@ def process_workout_excel_data():
 
     print("Section start positions: ", section_start_positions)
 
+    # Find all occurrences of "Superset num exercises" and their positions
+    superset_start_positions = collections.deque([])
+    col_index = workout_info_df.columns.get_loc("Supersets")
+    for row_index, row in workout_info_df.iterrows():
+        if row["Supersets"] == "Superset num exercises":
+            superset_start_positions.append((row_index, col_index))
+
+    print("Superset start positions: ", superset_start_positions)
+
     # Find all occurrences of "Exercise name" and their positions
     exercise_start_positions = collections.deque([])
     col_index = workout_info_df.columns.get_loc("Exercises")
@@ -122,31 +131,42 @@ def process_workout_excel_data():
                 section_info["amrap_duration"] = workout_info_df.iloc[s_row + 1, s_col + 6]
             elif section_info["section_format"].lower() == "timed":
                 section_info["round"] = workout_info_df.iloc[s_row + 1, s_col + 7]
-            section_info["exercises"] = []
+            section_info["num_supersets"] = workout_info_df.iloc[s_row + 1, s_col + 8]
+            section_info["supersets"] = []
 
-            # Go through exercise data
-            for num_exercise in range(section_info["num_exercises"]):
-                exercise_info = {}
-                e_row, e_col = exercise_start_positions.popleft()
+            # Go through superset data
+            for num_superset in range(section_info["num_supersets"]):
+                superset_info = {}
+                e_row, e_col = superset_start_positions.popleft()
                 print("")
-                print(f"EXERCISE ({e_row}, {e_col})")
-                exercise_info["exercise_name"] = workout_info_df.iloc[e_row + 1, e_col]
-                exercise_info["exercise_note"] = workout_info_df.iloc[e_row + 1, e_col + 1]
-                exercise_info["exercise_tempo"] = workout_info_df.iloc[e_row + 1, e_col + 2]
-                exercise_info["each_side"] = workout_info_df.iloc[e_row + 1, e_col + 3]
-                exercise_info["num_sets"] = workout_info_df.iloc[e_row + 1, e_col + 4]
-                exercise_info["sets"] = []
+                print(f"SUPERSET ({e_row}, {e_col})")
+                superset_info["num_exercises"] = workout_info_df.iloc[e_row + 1, e_col]
+                superset_info["exercises"] = []
 
-                # Go through set data
-                for num_set in range(exercise_info["num_sets"]):
-                    sets_info = {}
-                    set_row, set_col = set_start_positions.popleft()
+                # Go through exercise data
+                for num_exercise in range(superset_info["num_exercises"]):
+                    exercise_info = {}
+                    e_row, e_col = exercise_start_positions.popleft()
                     print("")
-                    print(f"SET ({set_row}, {set_col})")
-                    sets_info["set_reps"] = workout_info_df.iloc[set_row + 1, set_col]
-                    sets_info["set_rest"] = workout_info_df.iloc[set_row + 1, set_col + 1]
-                    exercise_info["sets"].append(sets_info)
-                section_info["exercises"].append(exercise_info)
+                    print(f"EXERCISE ({e_row}, {e_col})")
+                    exercise_info["exercise_name"] = workout_info_df.iloc[e_row + 1, e_col]
+                    exercise_info["exercise_note"] = workout_info_df.iloc[e_row + 1, e_col + 1]
+                    exercise_info["exercise_tempo"] = workout_info_df.iloc[e_row + 1, e_col + 2]
+                    exercise_info["each_side"] = workout_info_df.iloc[e_row + 1, e_col + 3]
+                    exercise_info["num_sets"] = workout_info_df.iloc[e_row + 1, e_col + 4]
+                    exercise_info["sets"] = []
+
+                    # Go through set data
+                    for num_set in range(exercise_info["num_sets"]):
+                        sets_info = {}
+                        set_row, set_col = set_start_positions.popleft()
+                        print("")
+                        print(f"SET ({set_row}, {set_col})")
+                        sets_info["set_reps"] = workout_info_df.iloc[set_row + 1, set_col]
+                        sets_info["set_rest"] = workout_info_df.iloc[set_row + 1, set_col + 1]
+                        exercise_info["sets"].append(sets_info)
+                    superset_info["exercises"].append(exercise_info)
+                section_info["supersets"].append(superset_info)
             workout_info["sections"].append(section_info)
         workouts_info.append(workout_info)
 
@@ -190,6 +210,19 @@ def get_exercise_id(exercise_name, session, access_token):
 
     return exercise_id
 
+def create_supersets_list(supersets_info, session, headers, access_token):
+    supersets_list = []
+    for superset_info in supersets_info:
+        # superset info
+        info = {
+            "supersets": create_exercises_list(superset_info["exercises"], session, headers, access_token)
+        }
+
+        # add superset info to list
+        supersets_list.append(info)
+
+    return supersets_list
+
 def create_exercises_list(exercises_info, session, headers, access_token):
     exercises_list = []
     for exercise_info in exercises_info:
@@ -198,18 +231,14 @@ def create_exercises_list(exercises_info, session, headers, access_token):
         
         # exercise info
         info = {
-                        "supersets": [
-                                {
-                                    "alternatives": [],
-                                    "each_side": True if exercise_info["each_side"] == 1 else False,
-                                    "exercise": exercise_id,
-                                    "exercise_instance": get_individual_exercise_data(exercise_id, session, headers),
-                                    "note": exercise_info["exercise_note"],
-                                    "tempo": exercise_info["exercise_tempo"],
-                                    "training_sets": create_sets_list(exercise_info.get("sets", []))
-                                }
-                            ]
-                        }
+                "alternatives": [],
+                "each_side": True if exercise_info["each_side"] == 1 else False,
+                "exercise": exercise_id,
+                "exercise_instance": get_individual_exercise_data(exercise_id, session, headers),
+                "note": exercise_info["exercise_note"],
+                "tempo": exercise_info["exercise_tempo"],
+                "training_sets": create_sets_list(exercise_info.get("sets", []))
+        }
 
         # add exercise info to list
         exercises_list.append(info)
@@ -222,7 +251,7 @@ def create_section_list(sections_info, session, headers, access_token):
         # section info
         info = {
                     "attachments": [],
-                    "exercises": create_exercises_list(section_info["exercises"], session, headers, access_token),
+                    "exercises": create_supersets_list(section_info["supersets"], session, headers, access_token),
                     "format": section_info["section_format"].lower(), 
                     "note": section_info["section_note"],
                     "time": "", 
