@@ -8,6 +8,16 @@ import getpass
 import collections
 import json
 
+# FUNCTIONALITY
+# 1. Regular without supersets CHECK
+# 2. Regular with supersets CHECK
+# 3. Intervals CHECK
+# 4. EMOM
+# 5. AMRAP
+# 6. For time
+
+# Status != 1, ignores CHECK
+
 def min_to_seconds(minutes):
     return int(minutes*60)
 
@@ -56,6 +66,7 @@ def process_workout_excel_data():
         print(f"Error: Failed to load Excel file: {e}")
         return
     
+    print("Getting start positions for each workout in Excel sheet...")
     # Find all occurrences of "Status" and their positions
     workout_start_positions = collections.deque([])
     col_index = workout_info_df.columns.get_loc("Workouts")
@@ -63,7 +74,7 @@ def process_workout_excel_data():
         if row["Workouts"] == "Status":
             workout_start_positions.append((row_index, col_index))
 
-    print("Workout start positions: ", workout_start_positions)
+    #print("Workout start positions: ", workout_start_positions)
 
     # Find all occurrences of "Section name" and their positions
     section_start_positions = collections.deque([])
@@ -72,7 +83,7 @@ def process_workout_excel_data():
         if row["Sections"] == "Section name":
             section_start_positions.append((row_index, col_index))
 
-    print("Section start positions: ", section_start_positions)
+    #print("Section start positions: ", section_start_positions)
 
     # Find all occurrences of "Superset num exercises" and their positions
     superset_start_positions = collections.deque([])
@@ -81,7 +92,7 @@ def process_workout_excel_data():
         if row["Supersets"] == "Superset num exercises":
             superset_start_positions.append((row_index, col_index))
 
-    print("Superset start positions: ", superset_start_positions)
+    #print("Superset start positions: ", superset_start_positions)
 
     # Find all occurrences of "Exercise name" and their positions
     exercise_start_positions = collections.deque([])
@@ -90,16 +101,16 @@ def process_workout_excel_data():
         if row["Exercises"] == "Exercise name":
             exercise_start_positions.append((row_index, col_index))
 
-    print("Exercise start positions: ", exercise_start_positions)
+    #print("Exercise start positions: ", exercise_start_positions)
 
-    # Find all occurrences of "Status" and their positions
+    # Find all occurrences of "Set reps" and their positions
     set_start_positions = collections.deque([])
     col_index = workout_info_df.columns.get_loc("Sets")
     for row_index, row in workout_info_df.iterrows():
-        if row["Sets"] == "Set reps":
+        if "set reps" in str(row["Sets"]).lower():
             set_start_positions.append((row_index, col_index))
 
-    print("Set start positions: ", set_start_positions)
+    #print("Set start positions: ", set_start_positions)
 
     workouts_info = []
 
@@ -107,8 +118,7 @@ def process_workout_excel_data():
     for num_workout in range(len(workout_start_positions)):
         workout_info = {}
         w_row, w_col = workout_start_positions.popleft()
-        print("")
-        print(f"WORKOUT ({w_row}, {w_col})")
+        print(f"Workout {num_workout + 1}...")
         workout_info["status"] = workout_info_df.iloc[w_row + 1, w_col]
         workout_info["title"] = workout_info_df.iloc[w_row + 1, w_col + 1]
         workout_info["description"] = workout_info_df.iloc[w_row + 1, w_col + 2]
@@ -119,27 +129,20 @@ def process_workout_excel_data():
         for num_section in range(workout_info["num_sections"]):
             section_info = {}
             s_row, s_col = section_start_positions.popleft()
-            print("")
-            print(f"SECTION ({s_row}, {s_col})")
+            print(f"\tSection {num_section + 1}...")
             section_info["section_name"] = workout_info_df.iloc[s_row + 1, s_col]
             section_info["section_format"] = workout_info_df.iloc[s_row + 1, s_col + 1]
             section_info["section_type"] = workout_info_df.iloc[s_row + 1, s_col + 2]
             section_info["section_note"] = workout_info_df.iloc[s_row + 1, s_col + 3]
             section_info["section_duration"] = workout_info_df.iloc[s_row + 1, s_col + 4]
-            section_info["num_exercises"] = workout_info_df.iloc[s_row + 1, s_col + 5]
-            if section_info["section_format"].lower() == "amrap":
-                section_info["amrap_duration"] = workout_info_df.iloc[s_row + 1, s_col + 6]
-            elif section_info["section_format"].lower() == "timed":
-                section_info["round"] = workout_info_df.iloc[s_row + 1, s_col + 7]
-            section_info["num_supersets"] = workout_info_df.iloc[s_row + 1, s_col + 8]
+            section_info["num_supersets"] = workout_info_df.iloc[s_row + 1, s_col + 5]
             section_info["supersets"] = []
 
             # Go through superset data
             for num_superset in range(section_info["num_supersets"]):
                 superset_info = {}
                 e_row, e_col = superset_start_positions.popleft()
-                print("")
-                print(f"SUPERSET ({e_row}, {e_col})")
+                print(f"\t\tSuperset {num_superset + 1}...")
                 superset_info["num_exercises"] = workout_info_df.iloc[e_row + 1, e_col]
                 superset_info["exercises"] = []
 
@@ -147,8 +150,7 @@ def process_workout_excel_data():
                 for num_exercise in range(superset_info["num_exercises"]):
                     exercise_info = {}
                     e_row, e_col = exercise_start_positions.popleft()
-                    print("")
-                    print(f"EXERCISE ({e_row}, {e_col})")
+                    print(f"\t\t\tExercise {num_exercise + 1}...")
                     exercise_info["exercise_name"] = workout_info_df.iloc[e_row + 1, e_col]
                     exercise_info["exercise_note"] = workout_info_df.iloc[e_row + 1, e_col + 1]
                     exercise_info["exercise_tempo"] = workout_info_df.iloc[e_row + 1, e_col + 2]
@@ -160,10 +162,10 @@ def process_workout_excel_data():
                     for num_set in range(exercise_info["num_sets"]):
                         sets_info = {}
                         set_row, set_col = set_start_positions.popleft()
-                        print("")
-                        print(f"SET ({set_row}, {set_col})")
+                        print(f"\t\t\t\tTraining set {num_set + 1}...")
                         sets_info["set_reps"] = workout_info_df.iloc[set_row + 1, set_col]
                         sets_info["set_rest"] = workout_info_df.iloc[set_row + 1, set_col + 1]
+                        sets_info["set_duration"] = workout_info_df.iloc[set_row + 1, set_col + 2]
                         exercise_info["sets"].append(sets_info)
                     superset_info["exercises"].append(exercise_info)
                 section_info["supersets"].append(superset_info)
@@ -180,8 +182,9 @@ def create_sets_list(sets_info):
         # set info
         info = {
             "_id": "67568790e5a972fdc8cd4325",
-            "reps": {"value": set_info["set_reps"]},
-            "rest": {"value": set_info["set_rest"]},
+            "reps": {"value": set_info.get("set_reps", "")},
+            "rest": {"value": set_info.get("set_rest", "")},
+            "duration": {"value": set_info.get("set_duration", "")},
             "weight": {
                 "set_unit": "5c40aa79690c9d44eafb575d",
                 "unit": "5c40aa79690c9d44eafb575d",
@@ -289,8 +292,8 @@ def create_workout_payload(workout_info, session, headers, access_token):
 def main():
     print("workouts.py...")
 
-    email = "ruben@wx-academy.com"
-    password = "Tp548624"
+    email = input("Enter your email: ").strip()
+    password = getpass.getpass("Enter your password: ").strip()
 
     session = requests.Session()
 
@@ -323,11 +326,12 @@ def main():
     # Define urls
     url = "https://api-prod3.everfit.io/api/workout/v2/add"
 
-    #print(json.dumps(get_individual_exercise_data("674342607fcb2f56da151c50", session, headers), indent=2))
-
     for workout in workout_information:
-        #payload = create_workout_payload(workout, session, headers)
-        #print(workout['sections'])
+        # continue if status is not 1
+        if workout['status'] != 1:
+            print(f"Skipping workout {workout['title']} (status is not 1)")
+            continue
+        print(f"Creating payload for {workout['title']}...")
         payload = {
             "author": "666c67f6c98eb80026f047c9",
             "conversion_id": None,
@@ -341,6 +345,7 @@ def main():
         }
         
         try:
+            print(f"Uploading {workout['title']}...")
             response = requests.post(url, json=payload, headers=headers, timeout=30)
                 
             # Check if the response contains an error
