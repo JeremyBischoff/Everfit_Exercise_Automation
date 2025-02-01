@@ -11,8 +11,8 @@ import json
 # FUNCTIONALITY
 # 1. Regular without supersets CHECK
 # 2. Regular with supersets CHECK
-# 3. Intervals CHECK
-# 4. EMOM
+# 3. Intervals 
+# 4. EMOM - add reps, duration=60, rest=0
 # 5. AMRAP
 # 6. For time
 
@@ -176,22 +176,26 @@ def process_workout_excel_data():
 
 # Create payload functions
 
-def create_sets_list(sets_info):
+def create_sets_list(sets_info, section_format):
     sets_list = []
     for set_info in sets_info:
         # set info
-        info = {
-            "_id": "67568790e5a972fdc8cd4325",
-            "reps": {"value": set_info.get("set_reps", "")},
-            "rest": {"value": set_info.get("set_rest", "")},
-            "duration": {"value": set_info.get("set_duration", "")},
-            "weight": {
-                "set_unit": "5c40aa79690c9d44eafb575d",
-                "unit": "5c40aa79690c9d44eafb575d",
-                "value": ""
-            }
-        }
+        info = {}
 
+        if section_format == "regular":
+            info["reps"] = {"value": set_info.get("set_reps", "")}
+            info["rest"] = {"value": set_info.get("set_rest", "")}
+        
+        if section_format == "interval":
+            info["duration"] = {"value": set_info.get("set_duration", "")} # it is there but invisible to user
+            info["rest"] = {"value": set_info.get("set_rest", "")}
+
+        # EMOM adjustment
+        if section_format == "emom":
+            info["reps"] = {"value": set_info.get("set_reps", "")}
+            info["duration"] = {"value": "60"} # it is there but invisible to user
+            info["rest"] = {"value": "0"}
+            
         # add set info to list
         sets_list.append(info)
 
@@ -213,12 +217,12 @@ def get_exercise_id(exercise_name, session, access_token):
 
     return exercise_id
 
-def create_supersets_list(supersets_info, session, headers, access_token):
+def create_supersets_list(supersets_info, section_format, session, headers, access_token):
     supersets_list = []
     for superset_info in supersets_info:
         # superset info
         info = {
-            "supersets": create_exercises_list(superset_info["exercises"], session, headers, access_token)
+            "supersets": create_exercises_list(superset_info["exercises"], section_format, session, headers, access_token)
         }
 
         # add superset info to list
@@ -226,7 +230,7 @@ def create_supersets_list(supersets_info, session, headers, access_token):
 
     return supersets_list
 
-def create_exercises_list(exercises_info, session, headers, access_token):
+def create_exercises_list(exercises_info, section_format, session, headers, access_token):
     exercises_list = []
     for exercise_info in exercises_info:
         # get exercise id
@@ -240,7 +244,7 @@ def create_exercises_list(exercises_info, session, headers, access_token):
                 "exercise_instance": get_individual_exercise_data(exercise_id, session, headers),
                 "note": exercise_info["exercise_note"],
                 "tempo": exercise_info["exercise_tempo"],
-                "training_sets": create_sets_list(exercise_info.get("sets", []))
+                "training_sets": create_sets_list(exercise_info.get("sets", []), section_format)
         }
 
         # add exercise info to list
@@ -251,16 +255,17 @@ def create_exercises_list(exercises_info, session, headers, access_token):
 def create_section_list(sections_info, session, headers, access_token):
     section_list = []
     for section_info in sections_info:
+        section_format = section_info["section_format"].lower()
         # section info
         info = {
                     "attachments": [],
-                    "exercises": create_supersets_list(section_info["supersets"], session, headers, access_token),
-                    "format": section_info["section_format"].lower(), 
+                    "exercises": create_supersets_list(section_info["supersets"], section_format, session, headers, access_token),
+                    "format": section_format, 
                     "note": section_info["section_note"],
                     "time": "", 
                     "title": section_info["section_name"],
                     "type": filter_section_type(section_info["section_type"])
-                }
+        }
         
         # add time duration if format is 'amrap'
         if section_info["section_format"].lower() == 'amrap':
@@ -268,6 +273,10 @@ def create_section_list(sections_info, session, headers, access_token):
         # add 'round' key if format is 'timed'
         elif section_info["section_format"].lower() == 'timed':
             info["round"] = section_info.get("timed_rounds", 1)
+
+        # adjust EMOM format
+        if section_format == 'emom':
+            info["format"] = "interval"
 
         # add section info to list
         section_list.append(info)
@@ -354,8 +363,8 @@ def main():
                 """print("Request Headers:", response.request.headers)
                 print("Request Payload:", payload)
                 print("Response Status Code:", response.status_code)
-                print("Response Headers:", response.headers)
-                print("Response Body:", response.text)"""
+                print("Response Headers:", response.headers)"""
+                print("Response Body:", response.text)
             else:
                 print("Successfully added workout.")
         except requests.exceptions.RequestException as e:
