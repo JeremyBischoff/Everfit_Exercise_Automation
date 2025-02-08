@@ -305,10 +305,8 @@ def create_workout_payload(workout_info, session, headers, access_token):
 def main():
     print("workouts.py...")
 
-    email = "ruben@wx-academy.com"
-    password = "Tp548624"
-    #email = input("Enter your email: ").strip()
-    #password = getpass.getpass("Enter your password: ").strip()
+    email = input("Enter your email: ").strip()
+    password = getpass.getpass("Enter your password: ").strip()
 
     session = requests.Session()
 
