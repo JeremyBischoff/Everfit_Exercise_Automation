@@ -183,16 +183,21 @@ def create_sets_list(sets_info, section_format):
         # Regular
         if section_format == "regular":
             info["reps"] = {"value": na_safe(set_info.get("set_reps", ""))}
+            info["duration"] = {"value": na_safe(set_info.get("set_duration", ""))}
             info["rest"] = {"value": na_safe(set_info.get("set_rest", ""))}
+            info["weight"] = {"value": na_safe(set_info.get("set_weight", ""))}
         # Interval 
         if section_format == "interval":
+            info["reps"] = {"value": na_safe(set_info.get("set_reps", ""))}
             info["duration"] = {"value": na_safe(set_info.get("set_duration", ""))} # it is there but invisible to user on desktop
             info["rest"] = {"value": na_safe(set_info.get("set_rest", ""))}
+            info["weight"] = {"value": na_safe(set_info.get("set_weight", ""))}
         # EMOM
         if section_format == "emom":
             info["reps"] = {"value": na_safe(set_info.get("set_reps", ""))}
             info["duration"] = {"value": "60"} # it is there but invisible to user on desktop
             info["rest"] = {"value": "0"}
+            info["weight"] = {"value": na_safe(set_info.get("set_weight", ""))}
         # AMRAP
         if section_format == "amrap":
             info["reps"] = {"value": na_safe(set_info.get("set_reps", ""))}
