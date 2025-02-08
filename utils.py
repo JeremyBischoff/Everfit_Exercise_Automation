@@ -232,7 +232,7 @@ def get_exercises_list(start_index, exercise_df, post_exercises_flag=True, put_e
                 "abs": safe_get(exercise_df, i, "Abs", 0),
                 "lower_back": safe_get(exercise_df, i, "Lower back", 0),
                 "obliques": safe_get(exercise_df, i, "Obliques", 0),
-                "glute": safe_get(exercise_df, i, "Glutes", 0),
+                "glute": safe_get(exercise_df, i, "Glute", 0),
                 "quads": safe_get(exercise_df, i, "Quads", 0),
                 "hamstrings": safe_get(exercise_df, i, "Hamstrings", 0),
                 "calves": safe_get(exercise_df, i, "Calves", 0),
