@@ -11,9 +11,9 @@ import json
 # FUNCTIONALITY
 # 1. Regular without supersets CHECK
 # 2. Regular with supersets CHECK
-# 3. Intervals 
-# 4. EMOM - add reps, duration=60, rest=0
-# 5. AMRAP
+# 3. Intervals CHECK (ISH)
+# 4. EMOM - add reps, duration=60, rest=0 CHECK (ISH)
+# 5. AMRAP CHECK (ISH)
 # 6. For time
 
 # Status != 1, ignores CHECK
@@ -74,16 +74,12 @@ def process_workout_excel_data():
         if row["Workouts"] == "Status":
             workout_start_positions.append((row_index, col_index))
 
-    #print("Workout start positions: ", workout_start_positions)
-
     # Find all occurrences of "Section name" and their positions
     section_start_positions = collections.deque([])
     col_index = workout_info_df.columns.get_loc("Sections")
     for row_index, row in workout_info_df.iterrows():
         if row["Sections"] == "Section name":
             section_start_positions.append((row_index, col_index))
-
-    #print("Section start positions: ", section_start_positions)
 
     # Find all occurrences of "Superset num exercises" and their positions
     superset_start_positions = collections.deque([])
@@ -92,8 +88,6 @@ def process_workout_excel_data():
         if row["Supersets"] == "Superset num exercises":
             superset_start_positions.append((row_index, col_index))
 
-    #print("Superset start positions: ", superset_start_positions)
-
     # Find all occurrences of "Exercise name" and their positions
     exercise_start_positions = collections.deque([])
     col_index = workout_info_df.columns.get_loc("Exercises")
@@ -101,16 +95,12 @@ def process_workout_excel_data():
         if row["Exercises"] == "Exercise name":
             exercise_start_positions.append((row_index, col_index))
 
-    #print("Exercise start positions: ", exercise_start_positions)
-
     # Find all occurrences of "Set reps" and their positions
     set_start_positions = collections.deque([])
     col_index = workout_info_df.columns.get_loc("Sets")
     for row_index, row in workout_info_df.iterrows():
         if "set reps" in str(row["Sets"]).lower():
             set_start_positions.append((row_index, col_index))
-
-    #print("Set start positions: ", set_start_positions)
 
     workouts_info = []
 
@@ -135,7 +125,8 @@ def process_workout_excel_data():
             section_info["section_type"] = workout_info_df.iloc[s_row + 1, s_col + 2]
             section_info["section_note"] = workout_info_df.iloc[s_row + 1, s_col + 3]
             section_info["section_duration"] = workout_info_df.iloc[s_row + 1, s_col + 4]
-            section_info["num_supersets"] = workout_info_df.iloc[s_row + 1, s_col + 5]
+            section_info["section_rounds"] = workout_info_df.iloc[s_row + 1, s_col + 5]
+            section_info["num_supersets"] = workout_info_df.iloc[s_row + 1, s_col + 6]
             section_info["supersets"] = []
 
             # Go through superset data
@@ -166,6 +157,7 @@ def process_workout_excel_data():
                         sets_info["set_reps"] = workout_info_df.iloc[set_row + 1, set_col]
                         sets_info["set_rest"] = workout_info_df.iloc[set_row + 1, set_col + 1]
                         sets_info["set_duration"] = workout_info_df.iloc[set_row + 1, set_col + 2]
+                        sets_info["set_weight"] = workout_info_df.iloc[set_row + 1, set_col + 3]
                         exercise_info["sets"].append(sets_info)
                     superset_info["exercises"].append(exercise_info)
                 section_info["supersets"].append(superset_info)
@@ -176,25 +168,43 @@ def process_workout_excel_data():
 
 # Create payload functions
 
+def na_safe(val):
+    if pd.isna(val):
+        return ""
+    else: 
+        return val
+
 def create_sets_list(sets_info, section_format):
     sets_list = []
     for set_info in sets_info:
         # set info
         info = {}
 
+        # Regular
         if section_format == "regular":
-            info["reps"] = {"value": set_info.get("set_reps", "")}
-            info["rest"] = {"value": set_info.get("set_rest", "")}
-        
+            info["reps"] = {"value": na_safe(set_info.get("set_reps", ""))}
+            info["rest"] = {"value": na_safe(set_info.get("set_rest", ""))}
+        # Interval 
         if section_format == "interval":
-            info["duration"] = {"value": set_info.get("set_duration", "")} # it is there but invisible to user
-            info["rest"] = {"value": set_info.get("set_rest", "")}
-
-        # EMOM adjustment
+            info["duration"] = {"value": na_safe(set_info.get("set_duration", ""))} # it is there but invisible to user on desktop
+            info["rest"] = {"value": na_safe(set_info.get("set_rest", ""))}
+        # EMOM
         if section_format == "emom":
-            info["reps"] = {"value": set_info.get("set_reps", "")}
-            info["duration"] = {"value": "60"} # it is there but invisible to user
+            info["reps"] = {"value": na_safe(set_info.get("set_reps", ""))}
+            info["duration"] = {"value": "60"} # it is there but invisible to user on desktop
             info["rest"] = {"value": "0"}
+        # AMRAP
+        if section_format == "amrap":
+            info["reps"] = {"value": na_safe(set_info.get("set_reps", ""))}
+            info["duration"] = {"value": na_safe(set_info.get("set_duration", ""))}
+            info["rest"] = {"value": "0"}
+            info["weight"] = {"value": na_safe(set_info.get("set_weight", ""))}
+        # Timed
+        if section_format == "timed":
+            info["reps"] = {"value": na_safe(set_info.get("set_reps", ""))}
+            info["duration"] = {"value": na_safe(set_info.get("set_duration", ""))}
+            info["rest"] = {"value": na_safe(set_info.get("set_rest", ""))}
+            info["weight"] = {"value": na_safe(set_info.get("set_weight", ""))}
             
         # add set info to list
         sets_list.append(info)
@@ -242,8 +252,8 @@ def create_exercises_list(exercises_info, section_format, session, headers, acce
                 "each_side": True if exercise_info["each_side"] == 1 else False,
                 "exercise": exercise_id,
                 "exercise_instance": get_individual_exercise_data(exercise_id, session, headers),
-                "note": exercise_info["exercise_note"],
-                "tempo": exercise_info["exercise_tempo"],
+                "note": na_safe(exercise_info["exercise_note"]),
+                "tempo": na_safe(exercise_info["exercise_tempo"]),
                 "training_sets": create_sets_list(exercise_info.get("sets", []), section_format)
         }
 
@@ -261,18 +271,12 @@ def create_section_list(sections_info, session, headers, access_token):
                     "attachments": [],
                     "exercises": create_supersets_list(section_info["supersets"], section_format, session, headers, access_token),
                     "format": section_format, 
-                    "note": section_info["section_note"],
-                    "time": "", 
-                    "title": section_info["section_name"],
+                    "time": na_safe((section_info.get("section_duration", 0)))*60,
+                    "round": na_safe(section_info.get("section_rounds", 1)),
+                    "note": na_safe(section_info.get("section_note", "")),
+                    "title": na_safe(section_info.get("section_name", "")),
                     "type": filter_section_type(section_info["section_type"])
         }
-        
-        # add time duration if format is 'amrap'
-        if section_info["section_format"].lower() == 'amrap':
-            info["time"] = min_to_seconds(section_info.get("amrap_duration", 30))
-        # add 'round' key if format is 'timed'
-        elif section_info["section_format"].lower() == 'timed':
-            info["round"] = section_info.get("timed_rounds", 1)
 
         # adjust EMOM format
         if section_format == 'emom':
@@ -301,8 +305,10 @@ def create_workout_payload(workout_info, session, headers, access_token):
 def main():
     print("workouts.py...")
 
-    email = input("Enter your email: ").strip()
-    password = getpass.getpass("Enter your password: ").strip()
+    email = "ruben@wx-academy.com"
+    password = "Tp548624"
+    #email = input("Enter your email: ").strip()
+    #password = getpass.getpass("Enter your password: ").strip()
 
     session = requests.Session()
 
