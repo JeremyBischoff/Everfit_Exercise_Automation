@@ -158,6 +158,7 @@ def process_workout_excel_data():
                         sets_info["set_rest"] = workout_info_df.iloc[set_row + 1, set_col + 1]
                         sets_info["set_duration"] = workout_info_df.iloc[set_row + 1, set_col + 2]
                         sets_info["set_weight"] = workout_info_df.iloc[set_row + 1, set_col + 3]
+                        sets_info["set_calories"] = workout_info_df.iloc[set_row + 1, set_col + 4]
                         exercise_info["sets"].append(sets_info)
                     superset_info["exercises"].append(exercise_info)
                 section_info["supersets"].append(superset_info)
@@ -186,30 +187,36 @@ def create_sets_list(sets_info, section_format):
             info["duration"] = {"value": na_safe(set_info.get("set_duration", ""))}
             info["rest"] = {"value": na_safe(set_info.get("set_rest", ""))}
             info["weight"] = {"value": na_safe(set_info.get("set_weight", ""))}
+            info["calories"] = {"value": na_safe(set_info.get("set_calories", ""))}
         # Interval 
         if section_format == "interval":
             info["reps"] = {"value": na_safe(set_info.get("set_reps", ""))}
             info["duration"] = {"value": na_safe(set_info.get("set_duration", ""))} # it is there but invisible to user on desktop
             info["rest"] = {"value": na_safe(set_info.get("set_rest", ""))}
             info["weight"] = {"value": na_safe(set_info.get("set_weight", ""))}
+            info["calories"] = {"value": na_safe(set_info.get("set_calories", ""))}
+
         # EMOM
         if section_format == "emom":
             info["reps"] = {"value": na_safe(set_info.get("set_reps", ""))}
             info["duration"] = {"value": "60"} # it is there but invisible to user on desktop
             info["rest"] = {"value": "0"}
             info["weight"] = {"value": na_safe(set_info.get("set_weight", ""))}
+            info["calories"] = {"value": na_safe(set_info.get("set_calories", ""))}
         # AMRAP
         if section_format == "amrap":
             info["reps"] = {"value": na_safe(set_info.get("set_reps", ""))}
             info["duration"] = {"value": na_safe(set_info.get("set_duration", ""))}
             info["rest"] = {"value": "0"}
             info["weight"] = {"value": na_safe(set_info.get("set_weight", ""))}
+            info["calories"] = {"value": na_safe(set_info.get("set_calories", ""))}
         # Timed
         if section_format == "timed":
             info["reps"] = {"value": na_safe(set_info.get("set_reps", ""))}
             info["duration"] = {"value": na_safe(set_info.get("set_duration", ""))}
             info["rest"] = {"value": na_safe(set_info.get("set_rest", ""))}
             info["weight"] = {"value": na_safe(set_info.get("set_weight", ""))}
+            info["calories"] = {"value": na_safe(set_info.get("set_calories", ""))}
             
         # add set info to list
         sets_list.append(info)
