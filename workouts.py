@@ -7,6 +7,7 @@ import requests
 import getpass
 import collections
 import json
+import math
 
 # FUNCTIONALITY
 # 1. Regular without supersets CHECK
@@ -118,6 +119,7 @@ def process_workout_excel_data():
         # Go through section data
         for num_section in range(workout_info["num_sections"]):
             section_info = {}
+            print(len(section_start_positions), section_start_positions)
             s_row, s_col = section_start_positions.popleft()
             print(f"\tSection {num_section + 1}...")
             section_info["section_name"] = workout_info_df.iloc[s_row + 1, s_col]
@@ -256,7 +258,7 @@ def create_exercises_list(exercises_info, section_format, session, headers, acce
     exercises_list = []
     for exercise_info in exercises_info:
         # get exercise id
-        exercise_id = get_exercise_id(exercise_info.get("exercise_name", ""), session, access_token)
+        exercise_id = get_exercise_id(na_safe(exercise_info.get("exercise_name", "")), session, access_token)
         
         # exercise info
         info = {
@@ -277,17 +279,17 @@ def create_exercises_list(exercises_info, section_format, session, headers, acce
 def create_section_list(sections_info, session, headers, access_token):
     section_list = []
     for section_info in sections_info:
-        section_format = section_info["section_format"].lower()
+        section_format = na_safe(section_info["section_format"].lower())
         # section info
         info = {
                     "attachments": [],
                     "exercises": create_supersets_list(section_info["supersets"], section_format, session, headers, access_token),
-                    "format": section_format, 
+                    "format": na_safe(section_format), 
                     "time": na_safe((section_info.get("section_duration", 0)))*60,
                     "round": na_safe(section_info.get("section_rounds", 1)),
                     "note": na_safe(section_info.get("section_note", "")),
                     "title": na_safe(section_info.get("section_name", "")),
-                    "type": filter_section_type(section_info["section_type"])
+                    "type": filter_section_type(na_safe(section_info["section_type"]))
         }
 
         # adjust EMOM format
@@ -303,8 +305,8 @@ def create_workout_payload(workout_info, session, headers, access_token):
 
     payload = {
         "author": "666c67f6c98eb80026f047c9",
-        "title": workout_info["title"],
-        "description": workout_info["description"],
+        "title": na_safe(workout_info["title"]),
+        "description": na_safe(workout_info.get("description", "")),
         "timezone": "America/Los_Angeles",
         "is_generated_by_ai": False,
         "sections": create_section_list(workout_info["sections"], session, headers, access_token),
@@ -360,8 +362,8 @@ def main():
         payload = {
             "author": "666c67f6c98eb80026f047c9",
             "conversion_id": None,
-            "title": workout['title'],
-            "description": workout['description'],
+            "title": na_safe(workout['title']),
+            "description": na_safe(workout['description']),
             "timezone": "America/Los_Angeles",
             "is_generated_by_ai": False,
             "sections": create_section_list(workout['sections'], session, headers, access_token),
@@ -385,6 +387,7 @@ def main():
                 print("Successfully added workout.")
         except requests.exceptions.RequestException as e:
             # Print the exception error if the request fails
+            print(payload)
             print("Request failed with error:", str(e))
     
     session.close()
